@@ -1,0 +1,80 @@
+ECE 330L Microprocessors Lab
+Final Project
+Spring 2025
+In this project you will implement an alarm clock using the Real Time Clock
+hardware module in the STM32F407.
+Clock Specifications:
+1) The clock must display the date and time. How you choose to do this is up to
+you. Using the 7 segment displays, you will need to show the day of the week, the
+month, the date, and the year. You will also need to show the current time. I
+recommend you set up the clock to run-in 24-hour mode vs. AM/PM, but you may
+do whichever mode you prefer. Options for showing this information includes using
+the marquee mode for the display and/or cycling through different “pages”.
+PC0 should put it into time/date setting mode, and PC1 should put it into alarm setting mode. Potentionmeter PA1 should be used to change values, and PC10 should change what value to change, going from hour, to minute, to second, to month, to day, to year, and then back to hour. 
+2) You must have a mode for setting the date and time. You may use any
+combination of buttons, switches, and knobs that you choose to implement this. It
+should be clear how to set the values when in this mode.
+3) You must have a mode for setting the Alarm time. You may use any
+combination of buttons, switches, and knobs that you choose to implement this. It
+should be clear how to set the values when in this mode.
+4) You must have a means of enabling or disabling the alarm. When the alarm is
+enabled, it is helpful to periodically show the time that the alarm is set to go off.
+5) The Alarm interrupt is tricky to setup, so I recommend that you use the Systik
+handler instead and check bit 8 in the RTC_ISR register to see when the alarm has
+been triggered, and then play a song or other sounds to implement the alarm. Once
+you start playing the alarm, you should clear bit 8 back to a zero.
+There is helpful reference information at the end of this document. For further help
+on the RTC, consult section 26 in the Processor Manual (there is a link to it in the
+assignment page).
+Feel free to adjust your clock design to enhance its usability.
+Deliverables:
+1) Submit your C program to Canvas as PDF or TXT. Be sure to comment your
+code or you will be docked points! This submittal is a team effort.
+2) Include a paragraph in your report discussing what you felt was the most
+ECE 330L Microprocessors Lab
+challenging part of your project and how you met this challenge.
+3) Obtain check-off by showing the operation of your program to your instructor or
+lab assistant.
+4) Individually answer the three ABET questions found in the Assignments section
+in Canvas. You will get points for answering these questions.
+Getting the RTC Clock to Work
+1. None of the RTC registers will operate properly until bit 8 in the PWR->CR
+register has been set to a 1. Here is the information on this register:
+Bit 8 DBP: Disable backup domain write protection In reset state, the RCC_BDCR register, the RTC registers (including the backup registers), and the BRE bit of the PWR_CSR register, are protected against parasitic write access. This bit must be set to enable write access to these registers. 0: Access to RTC and RTC Backup registers and backup SRAM disabled 1: Access to RTC and RTC Backup registers and backup SRAM enabled
+2. The RCC clock source has to be selected and enabled in the RCC->BDCR
+register. Bits 9 and 8 need to be set to 10 to select the LSI oscillator clock
+source, and bit 15 has to be set to a 1 to enable the RTC clock. Here is the
+information on this register:
+RTC register write protection After system reset, the RTC registers are protected against parasitic write access with the DBP bit of the PWR power control register (PWR_CR). The DBP bit must be set to enable RTC registers write access. After backup domain reset, all the RTC registers are write-protected. Writing to the RTC registers is enabled by writing a key into the Write Protection register, RTC_WPR. The following steps are required to unlock the write protection on all the RTC registers except for RTC_ISR[13:8], RTC_TAFCR, and RTC_BKPXR. 1. Write '0xCA' into the RTC_WPR register. 2. Write '0x53' into the RTC_WPR register. Writing a wrong key reactivates the write protection. The protection mechanism is not affected by system reset. Calendar initialization and configuration To program the initial time and date calendar values, including the time format and the prescaler configuration, the following sequence is required: 1. Set INIT bit to 1 in the RTC_ISR register to enter initialization mode. In this mode, the calendar counter is stopped and its value can be updated. 2. Poll INITF bit of in the RTC_ISR register. The initialization phase mode is entered when INITF is set to 1. It takes from 1 to 2 RTCCLK clock cycles (due to clock synchronization). 3. To generate a 1 Hz clock for the calendar counter, program first the synchronous prescaler factor in RTC_PRER register, and then program the asynchronous prescaler factor. Even if only one of the two fields needs to be changed, 2 separate write accesses must be performed to the RTC_PRER register. Load the initial time and date values in the shadow registers (RTC_TR and RTC_DR), and configure the time format (12 or 24 hours) through the FMT bit in the RTC_CR register. 5. Exit the initialization mode by clearing the INIT bit. The actual calendar counter value is then automatically loaded and the counting restarts after 4 RTCCLK clock cycles. When the initialization sequence is complete, the calendar starts counting. Programming the alarm A similar procedure must be followed to program or update the programmable alarm (Alarm A or Alarm B): 1. Clear ALRAE or ALRBIE in RTC_CR to disable Alarm A or Alarm B. 2. Poll ALRAWF or ALRBWF in RTC_ISR until it is set to make sure the access to alarm registers is allowed. This takes 1 to 2 RTCCLK clock cycles (due to clock synchronization). 3. Program the Alarm A or Alarm B registers (RTC_ALRMASSR/RTC_ALRMAR or RTC_ALRMBSSR/RTC_ALRMBR). 4. Set ALRAE or ALRBIE in the RTC_CR register to enable Alarm A or Alarm B again.
+ECE 330L Microprocessors Lab
+ECE 330L Microprocessors Lab
+3. Once the above two steps have been implemented, the clock should be running.
+You can check to see if it is by using this line of code to write the Time to the
+display. The second value should be ticking up: Seven_Segment(RTC->TR);
+4. Setting the Date, Time, and Alarm values require a specific sequence as
+defined below. Note that the RTC_PRER register already contains default
+values for a 32.768Khz clock source, but we are using an RC 32Khz clock
+source so if you want the timing to be precise, you need to include these two
+lines of code when you set the date and time to correct for the clock error.
+Default clock divider math: 32768/((127+1)*(255+1)) = 1Hz. The RC clock
+has a lot of error, and after testing I determined that it was running too fast,
+and was at a frequency of about 33152 Hz. Corrected clock divider math:
+33152/((127+1)*(258+1)) = 1Hz. These values were determined by allowing
+the clock to run for several hours and determining how many seconds it gained
+over several hours of running.
+RTC->PRER = 0x102; //Set lower portion to 258
+RTC->PRER |= 0x007F0000; //Set upper portion to 127
+ECE 330L Microprocessors Lab
+5. The Alarm A Interrupt and Enable bits are contained in the RTC_CR register.
+Bit 12 must be set to a 1 to enable the Alarm A interrupt. Bit 8 to must be set
+to enable Alarm A.
+6. The RTC_ISR register contains the status bit that indicates when Alarm A has
+been triggered by the time matching the alarm setting. This is indicated by bit
+8 being set to a 1. You need to clear this bit back to a 0 once you start playing
+ECE 330L Microprocessors Lab
+your alarm sound in the Systik handler:
+7. Time information is contained in the RTC_TR register. Consult the Processor
+Manual for more information:
+8. Date information is contained in the RTC_DR register. Consult the Processor
+Manual for more information.
+ECE 330L Microprocessors Lab

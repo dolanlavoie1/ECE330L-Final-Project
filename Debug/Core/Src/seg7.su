@@ -1,0 +1,2 @@
+../Core/Src/seg7.c:35:6:Seven_Segment_Digit	16	static
+../Core/Src/seg7.c:51:6:Seven_Segment	24	static
